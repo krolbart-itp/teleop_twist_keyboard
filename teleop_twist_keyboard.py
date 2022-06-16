@@ -77,6 +77,13 @@ speedBindings={
         'c':(1,.9),
     }
 
+configurationBindings={
+        's':(1,0),
+        'd':(0,0),
+        'a':(1,.1),
+        'f':(1,-0.1),
+    }
+
 class PublishThread(threading.Thread):
     def __init__(self, rate):
         super(PublishThread, self).__init__()
@@ -201,6 +208,7 @@ if __name__=="__main__":
     key_timeout = rospy.get_param("~key_timeout", 0.0)
     stamped = rospy.get_param("~stamped", False)
     twist_frame = rospy.get_param("~frame_id", '')
+    safe_mode = rospy.get_param("-safe_mode", True)
     if stamped:
         TwistMsg = TwistStamped
     if key_timeout == 0.0:
@@ -213,6 +221,7 @@ if __name__=="__main__":
     z = 0
     th = 0
     status = 0
+    safeModeTime = 0.1
 
     try:
         pub_thread.wait_for_subscribers()
@@ -235,6 +244,10 @@ if __name__=="__main__":
                 if (status == 14):
                     print(msg)
                 status = (status + 1) % 15
+            elif key in configurationBindings():
+                safeMode = configurationBindings[key][0]
+                safeModeTimeChange = configurationBindings[key][1]
+                safeModeTime += safeModeTimeChange
             else:
                 # Skip updating cmd_vel if key timeout and robot already
                 # stopped.
@@ -246,8 +259,14 @@ if __name__=="__main__":
                 th = 0
                 if (key == '\x03'):
                     break
- 
+
             pub_thread.update(x, y, z, th, speed, turn)
+            if safeMode == True:
+                print("Execution under safe Mode")
+                rospy.sleep(self.safeModeTime)
+                pub_thread.update(0, 0, 0, 0, 0, 0)
+                print("Execution under safe Mode has been completed")
+                status += 2
 
     except Exception as e:
         print(e)
